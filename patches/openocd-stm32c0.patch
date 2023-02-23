@@ -1,0 +1,189 @@
+From: Tarek BOCHKATI <tarek.bouchkati@gmail.com>
+Date: Fri, 3 Dec 2021 11:58:33 +0000 (+0100)
+Subject: flash/stm32l4x: support STM32C0x devices
+X-Git-Url: https://review.openocd.org/gitweb?p=openocd.git;a=commitdiff_plain;h=3fbf05298362fb0b773a6a3bb459789d2df7a60c
+
+flash/stm32l4x: support STM32C0x devices
+
+this new STM32 series family introduces 2 devices:
+STM32C011xx (0x443) and STM32C031xx (0x453)
+
+both devices have 32 Kbytes single flash bank.
+
+Change-Id: I4e890789e44e3b174c0e9c0e1068383ecdbb865f
+Signed-off-by: Tarek BOCHKATI <tarek.bouchkati@gmail.com>
+---
+
+diff --git a/src/flash/nor/stm32l4x.c b/src/flash/nor/stm32l4x.c
+index c67dbf75dc..045586578c 100644
+--- a/src/flash/nor/stm32l4x.c
++++ b/src/flash/nor/stm32l4x.c
+@@ -80,6 +80,12 @@
+  * http://www.st.com/resource/en/reference_manual/dm00451556.pdf
+  */
+ 
++/* STM32C0xxx series for reference.
++ *
++ * RM0490 (STM32C0x1)
++ * http://www.st.com/resource/en/reference_manual/dm00781702.pdf
++ */
++
+ /* STM32G0xxx series for reference.
+  *
+  * RM0444 (STM32G0x1)
+@@ -263,7 +269,7 @@ struct stm32l4_wrp {
+ };
+ 
+ /* human readable list of families this drivers supports (sorted alphabetically) */
+-static const char *device_families = "STM32G0/G4/L4/L4+/L5/U5/WB/WL";
++static const char *device_families = "STM32C0/G0/G4/L4/L4+/L5/U5/WB/WL";
+ 
+ static const struct stm32l4_rev stm32l47_l48xx_revs[] = {
+ 	{ 0x1000, "1" }, { 0x1001, "2" }, { 0x1003, "3" }, { 0x1007, "4" }
+@@ -273,6 +279,15 @@ static const struct stm32l4_rev stm32l43_l44xx_revs[] = {
+ 	{ 0x1000, "A" }, { 0x1001, "Z" }, { 0x2001, "Y" },
+ };
+ 
++
++static const struct stm32l4_rev stm32c01xx_revs[] = {
++	{ 0x1000, "A" },
++};
++
++static const struct stm32l4_rev stm32c03xx_revs[] = {
++	{ 0x1000, "A" },
++};
++
+ static const struct stm32l4_rev stm32g05_g06xx_revs[] = {
+ 	{ 0x1000, "A" },
+ };
+@@ -371,6 +386,30 @@ static const struct stm32l4_part_info stm32l4_parts[] = {
+ 	  .otp_base              = 0x1FFF7000,
+ 	  .otp_size              = 1024,
+ 	},
++	{
++	  .id                    = DEVID_STM32C01XX,
++	  .revs                  = stm32c01xx_revs,
++	  .num_revs              = ARRAY_SIZE(stm32c01xx_revs),
++	  .device_str            = "STM32C01xx",
++	  .max_flash_size_kb     = 32,
++	  .flags                 = F_NONE,
++	  .flash_regs_base       = 0x40022000,
++	  .fsize_addr            = 0x1FFF75A0,
++	  .otp_base              = 0x1FFF7000,
++	  .otp_size              = 1024,
++	},
++	{
++	  .id                    = DEVID_STM32C03XX,
++	  .revs                  = stm32c03xx_revs,
++	  .num_revs              = ARRAY_SIZE(stm32c03xx_revs),
++	  .device_str            = "STM32C03xx",
++	  .max_flash_size_kb     = 32,
++	  .flags                 = F_NONE,
++	  .flash_regs_base       = 0x40022000,
++	  .fsize_addr            = 0x1FFF75A0,
++	  .otp_base              = 0x1FFF7000,
++	  .otp_size              = 1024,
++	},
+ 	{
+ 	  .id                    = DEVID_STM32G05_G06XX,
+ 	  .revs                  = stm32g05_g06xx_revs,
+@@ -1855,6 +1894,8 @@ static int stm32l4_probe(struct flash_bank *bank)
+ 		}
+ 		break;
+ 	case DEVID_STM32L43_L44XX:
++	case DEVID_STM32C01XX:
++	case DEVID_STM32C03XX:
+ 	case DEVID_STM32G05_G06XX:
+ 	case DEVID_STM32G07_G08XX:
+ 	case DEVID_STM32L45_L46XX:
+diff --git a/src/flash/nor/stm32l4x.h b/src/flash/nor/stm32l4x.h
+index 06cc66d4d8..278038d763 100644
+--- a/src/flash/nor/stm32l4x.h
++++ b/src/flash/nor/stm32l4x.h
+@@ -87,6 +87,8 @@
+ /* Supported device IDs */
+ #define DEVID_STM32L47_L48XX	0x415
+ #define DEVID_STM32L43_L44XX	0x435
++#define DEVID_STM32C01XX		0x443
++#define DEVID_STM32C03XX		0x453
+ #define DEVID_STM32G05_G06XX	0x456
+ #define DEVID_STM32G07_G08XX	0x460
+ #define DEVID_STM32L49_L4AXX	0x461
+diff --git a/tcl/target/stm32c0x.cfg b/tcl/target/stm32c0x.cfg
+new file mode 100644
+index 0000000000..f74cd70225
+--- /dev/null
++++ b/tcl/target/stm32c0x.cfg
+@@ -0,0 +1,72 @@
++# script for stm32c0x family
++#
++# stm32c0 devices support SWD transports only.
++#
++
++source [find target/swj-dp.tcl]
++source [find mem_helper.tcl]
++
++if { [info exists CHIPNAME] } {
++	set _CHIPNAME $CHIPNAME
++} else {
++	set _CHIPNAME stm32c0x
++}
++
++set _ENDIAN little
++
++# Work-area is a space in RAM used for flash programming
++# By default use 6kB
++if { [info exists WORKAREASIZE] } {
++   set _WORKAREASIZE $WORKAREASIZE
++} else {
++   set _WORKAREASIZE 0x1800
++}
++
++#jtag scan chain
++if { [info exists CPUTAPID] } {
++   set _CPUTAPID $CPUTAPID
++} else {
++   # SWD IDCODE (single drop, arm)
++   set _CPUTAPID 0x0bc11477
++}
++
++swj_newdap $_CHIPNAME cpu -irlen 4 -ircapture 0x1 -irmask 0xf -expected-id $_CPUTAPID
++dap create $_CHIPNAME.dap -chain-position $_CHIPNAME.cpu
++
++set _TARGETNAME $_CHIPNAME.cpu
++target create $_TARGETNAME cortex_m -endian $_ENDIAN -dap $_CHIPNAME.dap
++
++$_TARGETNAME configure -work-area-phys 0x20000000 -work-area-size $_WORKAREASIZE -work-area-backup 0
++
++flash bank $_CHIPNAME.flash stm32l4x 0x08000000 0 0 0 $_TARGETNAME
++flash bank $_CHIPNAME.otp   stm32l4x 0x1fff7000 0 0 0 $_TARGETNAME
++
++# reasonable default
++adapter speed 2000
++
++adapter srst delay 100
++if {[using_jtag]} {
++	jtag_ntrst_delay 100
++}
++
++reset_config srst_nogate
++
++if {![using_hla]} {
++	# if srst is not fitted use SYSRESETREQ to
++	# perform a soft reset
++	cortex_m reset_config sysresetreq
++}
++
++$_TARGETNAME configure -event examine-end {
++	# Enable DBGMCU clock
++	# RCC_APB1ENR |= DBGMCUEN
++	mmw 0x4002103C 0x08000000 0
++
++	# Enable debug during low power modes (uses more power)
++	# DBGMCU_CR |= DBG_STANDBY | DBG_STOP
++	mmw 0x40015804 0x00000006 0
++
++	# Stop watchdog counters during halt
++	# DBGMCU_APB1_FZ |= DBG_WDGLS_STOP | DBG_WWDG_STOP
++	mmw 0x40015808 0x00001800 0
++}

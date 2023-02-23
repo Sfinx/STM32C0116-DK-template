@@ -1,0 +1,1 @@
+../../CMSIS/Device/ST/STM32C0xx/Source/Templates/system_stm32c0xx.c
