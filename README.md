@@ -13,3 +13,5 @@
  * untar the JLink to ../jlink and untar ../jlink/Samples/RTT/SEGGER_RTT_* to ./jlink/Samples/RTT/SEGGER_RTT
  * untar STM32CubeProgrammer to ../progcube
  * study Makefile & enjoy !
+
+**N.B. When RDP locked MCU will hard fault with any USB access to onboard STLink so supply only power over USB in this case**
